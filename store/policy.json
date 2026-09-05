@@ -1,0 +1,54 @@
+{
+  "app": "Rucksack",
+  "org": "SocialSure Private Limited",
+  "site": "https://shayanmohd.github.io/rucksack/",
+  "email": "shayanm2002@gmail.com",
+  "bg": "#F1E7D2",
+  "fg": "#2B2823",
+  "muted": "#625B4A",
+  "hair": "#D3C4A4",
+  "accent": "#2F5D50",
+  "bgDark": "#F1E7D2",
+  "fgDark": "#2B2823",
+  "mutedDark": "#625B4A",
+  "hairDark": "#D3C4A4",
+  "accentDark": "#2F5D50",
+  "fontFamily": "Alegreya, 'Iowan Old Style', Georgia, serif",
+  "fontCss": "fonts/fonts.css",
+  "headline": "Rucksack reads one number from your phone, the step counter, and keeps it here. It has no internet permission, so it could not send that number anywhere even if it wanted to.",
+  "permissions": [
+    [
+      "ACTIVITY_RECOGNITION",
+      "To read the step counter that is built into the phone. That counter is the only measurement Rucksack takes, and the app never asks when or where the steps happened. You can decline it and write your step count in by hand instead"
+    ],
+    [
+      "VIBRATE",
+      "One short pulse when you reach a waypoint, meet somebody on the road or finish a piece of gear. It can be turned off in the step ledger, and nothing else in the app buzzes"
+    ]
+  ],
+  "network": false,
+  "collects": [],
+  "storage": "Everything Rucksack knows lives in this device's private app storage: the daily step counts it has read, the kilometres they converted to, the camps you have made, the people you have met and the name you gave your wanderer. None of it is uploaded, and there is no account to attach it to. The app can write the whole record out as plain text or JSON whenever you ask, which is the only way any of it leaves the phone.",
+  "extra": [
+    [
+      "It never asks for location",
+      "Rucksack does not declare the fine or coarse location permission and does not use GPS. It does not know which country you are in, let alone which street. The distance you travel across the map is arithmetic on a step count, nothing more."
+    ],
+    [
+      "The weather in the app is not your weather",
+      "The rain, mist and frost at your camp belong to Elsewhere, not to the place you are standing. It is worked out from the date and the region your wanderer is in, which is precisely why the app needs neither a forecast service nor your position."
+    ],
+    [
+      "What the step counter can and cannot tell it",
+      "Android's step counter reports one number: how many steps the phone has counted since it last started up. Rucksack reads that number when you open the app, works out how much is new since the last reading, and adds it to today. It cannot see a route, a speed, a time of day or an activity type, because the sensor does not report any of those things. If the phone restarts, the steps taken between the restart and the next time you open the app are simply lost, and the app says so in the ledger rather than guessing."
+    ],
+    [
+      "It is not backed up to the cloud",
+      "The app declares allowBackup=\"false\", so Android does not copy your journey into Google Drive and does not carry it across in a device-to-device transfer. Moving a crossing to a new phone is the JSON export, which you do on purpose."
+    ],
+    [
+      "No account and nothing for sale",
+      "There is no sign-up, no email address and no profile. Nothing in the app is for sale, so there is no payment processor and no purchase history either. The journey belongs to the phone it was walked on."
+    ]
+  ]
+}
