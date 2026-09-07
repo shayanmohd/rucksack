@@ -9,6 +9,7 @@ var Store = (function () {
   var WALKED_STEPS = 1200;          // about a kilometre: the day counts toward a streak
   var HEARTH_PER_WEEK = 2;          // rest days a week that hold a streak open
   var MAX_DELTA = 60000;            // one sensor jump larger than this is not a walk
+  var MAX_DAY_STEPS = 120000;       // about 90 km on foot: past any real day, and the ledger stays readable
 
   function defaults() {
     return {
@@ -45,10 +46,14 @@ var Store = (function () {
           if (!/^\d{4}-\d{2}-\d{2}$/.test(k)) continue;
           var e = p.days[k];
           if (!e) continue;
-          var steps = Math.max(0, Math.round(Number(e.steps) || 0));
+          var steps = Math.min(MAX_DAY_STEPS, Math.max(0, Math.round(Number(e.steps) || 0)));
           d.days[k] = { steps: steps, km: kmFromSteps(steps).km, capped: kmFromSteps(steps).capped };
         }
       }
+      // A phone clock moved backwards, or a record written before the ledger,
+      // must never leave `start` later than the earliest day counted.
+      var ks = Object.keys(d.days).sort();
+      if (ks.length && (!d.start || ks[0] < d.start)) d.start = ks[0];
       if (p.met && typeof p.met === 'object') {
         for (var m in p.met) {
           var v = p.met[m];
@@ -97,6 +102,19 @@ var Store = (function () {
     return Math.round(t * 1000) / 1000;
   }
 
+  /** The first day on the road: the earliest day counted, whatever `start` says. */
+  function firstDay() {
+    var k = dayKeys(), s = db.start;
+    if (k.length && (!s || k[0] < s)) s = k[0];
+    return s || null;
+  }
+  /** Day one is the first day on the road. A clock moved backwards cannot make it negative. */
+  function dayNumber(d) {
+    var s = firstDay();
+    if (!s) return 1;
+    return Math.max(1, daysBetween(s, d) + 1);
+  }
+
   function dayOf(d) { return db.days[d] || null; }
   function stepsOn(d) { return db.days[d] ? db.days[d].steps : 0; }
   function kmOn(d) { return db.days[d] ? db.days[d].km : 0; }
@@ -109,9 +127,8 @@ var Store = (function () {
   }
 
   function setSteps(d, steps) {
-    steps = Math.max(0, Math.round(steps || 0));
-    if (!db.start) db.start = d;
-    if (d < db.start) db.start = d;
+    steps = Math.min(MAX_DAY_STEPS, Math.max(0, Math.round(steps || 0)));
+    if (!db.start || d < db.start) db.start = d;
     var c = kmFromSteps(steps);
     if (steps === 0 && !db.days[d]) db.days[d] = { steps: 0, km: 0, capped: false };
     else db.days[d] = { steps: steps, km: c.km, capped: c.capped };
@@ -178,7 +195,7 @@ var Store = (function () {
   function walkedOn(d) { return stepsOn(d) >= WALKED_STEPS; }
 
   function streak() {
-    var start = db.start, end = today();
+    var start = firstDay(), end = today();
     if (!start) return { current: 0, best: 0, hearth: HEARTH_PER_WEEK, forged: {}, days: 0 };
     var span = daysBetween(start, end);
     if (span < 0) { start = end; span = 0; }
@@ -279,12 +296,14 @@ var Store = (function () {
 
   return {
     KEY: KEY, DAY_CAP_KM: DAY_CAP_KM, WALKED_STEPS: WALKED_STEPS, HEARTH_PER_WEEK: HEARTH_PER_WEEK,
+    MAX_DAY_STEPS: MAX_DAY_STEPS,
     all: function () { return db; },
     save: save,
     ymd: ymd, parse: parse, today: today, addDays: addDays, daysBetween: daysBetween,
     longDate: longDate, shortDate: shortDate, MONTHS: MON,
     kmFromSteps: kmFromSteps,
     dayKeys: dayKeys, totalKm: totalKm, dayOf: dayOf, stepsOn: stepsOn, kmOn: kmOn,
+    firstDay: firstDay, dayNumber: dayNumber,
     kmBefore: kmBefore, setSteps: setSteps, addSteps: addSteps,
     sensorAvailable: sensorAvailable, sensorAllowed: sensorAllowed, sensorRaw: sensorRaw,
     pollSensor: pollSensor, startSensor: startSensor, useManual: useManual,

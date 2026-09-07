@@ -10,3 +10,5 @@ android/app/build/
 android/app/src/main/assets/www/
 store/preview/
 node_modules/
+test/shots/
+test/shots-dark/

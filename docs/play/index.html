@@ -18,6 +18,7 @@
     <div class="ob-plate"><canvas id="obCanvas"></canvas></div>
     <div class="ob-body">
       <div class="ob-card" data-step="0">
+        <div class="ob-mark" id="obMark"></div>
         <p class="ob-kicker">Elsewhere</p>
         <h1>Everything on this map is walked.</h1>
         <p>There is no fast travel, no boost to buy and no way to skip a kilometre. The only thing that moves your wanderer is your own feet, on ordinary days, in the gaps of an ordinary life.</p>
@@ -63,8 +64,8 @@
     <div class="scroller">
       <div class="plate">
         <canvas id="campCanvas"></canvas>
-        <p class="plate-cap" id="campWeather"></p>
       </div>
+      <p class="wx"><b>Tonight</b><span id="campWeather"></span></p>
 
       <div class="arrive" id="arriveBox" hidden>
         <p id="arriveLine"></p>
@@ -77,16 +78,16 @@
         <p class="lede" id="campNote"></p>
       </header>
 
+      <section class="ribbon" aria-label="The whole road">
+        <div class="ribbon-band" id="ribbonBand"></div>
+        <p class="ribbon-ends"><span>Fenwarden's Gate</span><b id="ribbonPct"></b><span>Cael</span></p>
+        <p class="ribbon-line" id="aheadLine"></p>
+      </section>
+
       <div class="figs">
         <div class="fig"><b id="figToday"></b><span>today</span></div>
         <div class="fig"><b id="figTotal"></b><span>walked in all</span></div>
         <div class="fig"><b id="figStreak"></b><span>day streak</span></div>
-      </div>
-
-      <div class="ahead" id="aheadBox">
-        <p class="k">Ahead</p>
-        <p class="v" id="aheadLine"></p>
-        <div class="meter"><i id="aheadBar"></i></div>
       </div>
 
       <div id="encList"></div>
@@ -106,12 +107,13 @@
       <p class="mt-km" id="mapKm"></p>
     </div>
     <div class="map-tools">
-      <button class="tool" id="mapMe" aria-label="Centre on my wanderer">Me</button>
-      <button class="tool" id="mapFit" aria-label="Show the whole continent">All</button>
-      <button class="tool" id="mapIn" aria-label="Zoom in">+</button>
-      <button class="tool" id="mapOut" aria-label="Zoom out">&minus;</button>
+      <button class="tool" id="mapMe" aria-label="Centre on my wanderer"></button>
+      <button class="tool" id="mapFit" aria-label="Show the whole continent"></button>
+      <button class="tool" id="mapIn" aria-label="Zoom in"></button>
+      <button class="tool" id="mapOut" aria-label="Zoom out"></button>
     </div>
     <div class="map-foot" id="mapFoot"></div>
+    <div class="map-wait" id="mapWait" hidden>Drawing Elsewhere</div>
   </section>
 
   <!-- --------------------------------------------------------------- journal -->
@@ -165,6 +167,7 @@
           <input type="number" id="manualSteps" min="0" max="120000" step="1" inputmode="numeric" aria-label="Today's step count">
           <button class="btn small" id="manualSave">Save</button>
         </div>
+        <p class="err" id="manualErr" role="alert" hidden></p>
         <p class="fine">Write down the total your phone or watch shows for today. Saving replaces today's number rather than adding to it.</p>
       </div>
 
@@ -223,6 +226,7 @@
 
 <p id="toast" role="status" aria-live="polite"></p>
 
+<script src="js/marks.js"></script>
 <script src="js/content.js"></script>
 <script src="js/encounters.js"></script>
 <script src="js/store.js"></script>

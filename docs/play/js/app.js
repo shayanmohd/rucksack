@@ -5,8 +5,14 @@ var App = (function () {
   var $ = function (s) { return document.querySelector(s); };
   var $$ = function (s) { return Array.prototype.slice.call(document.querySelectorAll(s)); };
   var view = 'camp';
-  var campRaf = 0, campStart = 0;
+  var campRaf = 0, campStart = 0, mapDrawn = false;
   var pollTimer = 0, permTimer = 0;
+
+  /* Android maps "animations off" to prefers-reduced-motion. When it is set the
+     camp still gets painted in full, once, with the flame held at its middle
+     value: the motion stops, none of the picture goes away. */
+  var motionQ = window.matchMedia ? window.matchMedia('(prefers-reduced-motion: reduce)') : null;
+  function stillness() { return !!(motionQ && motionQ.matches); }
 
   function native(fn) { return !!(window.Native && typeof Native[fn] === 'function'); }
   function buzz(ms, amp) {
@@ -66,7 +72,7 @@ var App = (function () {
     var reg = Content.regionAt(to);
     var wx = Content.weatherFor(date, to);
     var h = Content.hash(date + 'entry');
-    var day = Store.daysBetween(Store.all().start || date, date) + 1;
+    var day = Store.dayNumber(date);
     var parts = [];
 
     if (km < 0.15) {
@@ -117,9 +123,9 @@ var App = (function () {
     var reg = Content.REGIONS[0];
     Paint.camp(c, r.width, r.height, {
       region: reg, weather: Content.weatherFor('2026-05-04', 40), km: 40,
-      date: '2026-05-04', t: performance.now(), gear: { cloak: true }, biscuit: false
+      date: '2026-05-04', t: stillness() ? 0 : performance.now(), gear: { cloak: true }, biscuit: false
     });
-    obRaf = requestAnimationFrame(obPaint);
+    obRaf = stillness() ? 0 : requestAnimationFrame(obPaint);
   }
 
   function obShow() {
@@ -206,6 +212,28 @@ var App = (function () {
     };
   }
 
+  /* ------------------------------------------------------------- the ribbon
+     The signature element: the whole road as contour lines with the walked part
+     inked across them toward a low sun, which is Cael. Built once. */
+  var ribbon = null;
+  function ensureRibbon() {
+    if (ribbon) return ribbon;
+    var band = $('#ribbonBand');
+    if (!band) return null;
+    ribbon = Marks.ribbon();
+    band.appendChild(ribbon.node);
+    return ribbon;
+  }
+  function renderRibbon() {
+    var r = ensureRibbon();
+    if (!r) return;
+    var total = Math.min(Store.totalKm(), Content.TOTAL_KM);
+    var camp = Math.min(Store.campKm(), Content.TOTAL_KM);
+    r.set(total / Content.TOTAL_KM, camp / Content.TOTAL_KM);
+    var pct = total / Content.TOTAL_KM * 100;
+    $('#ribbonPct').textContent = (pct >= 1 ? Math.round(pct) : pct.toFixed(1)) + '% walked';
+  }
+
   /* -------------------------------------------------------------- the camp */
   function gearMap() {
     var st = Store.streak(), m = {};
@@ -221,6 +249,7 @@ var App = (function () {
   function campLoop() {
     var cv = $('#campCanvas');
     if (!cv || $('#v-camp').hidden) { campRaf = 0; return; }
+    var still = stillness();
     var r = cv.getBoundingClientRect();
     var dpr = Math.min(2.5, window.devicePixelRatio || 1);
     var W = Math.round(r.width * dpr), H = Math.round(r.height * dpr);
@@ -231,10 +260,10 @@ var App = (function () {
     var d = Store.all().camp && Store.all().camp.d ? Store.all().camp.d : Store.today();
     Paint.camp(c, r.width, r.height, {
       region: Content.regionAt(km), weather: Content.weatherFor(d, km),
-      km: km, date: d, t: performance.now() - campStart,
+      km: km, date: d, t: still ? 0 : performance.now() - campStart,
       gear: gearFlags(), biscuit: !!Store.all().flags.biscuit
     });
-    campRaf = requestAnimationFrame(campLoop);
+    campRaf = still ? 0 : requestAnimationFrame(campLoop);
   }
 
   function renderCamp() {
@@ -248,8 +277,8 @@ var App = (function () {
     var st = Store.streak();
 
     $('#campWeather').textContent = wx.camp;
-    var dayN = db.start ? Store.daysBetween(db.start, Store.today()) + 1 : 1;
-    $('#campDay').textContent = 'Day ' + dayN + ', ' + Store.longDate(Store.today());
+    renderRibbon();
+    $('#campDay').textContent = 'Day ' + Store.dayNumber(Store.today()) + ', ' + Store.longDate(Store.today());
 
     if (km <= 0.05) $('#campPlace').textContent = "Fenwarden's Gate";
     else if (last.km >= Content.TOTAL_KM) $('#campPlace').textContent = last.name;
@@ -265,14 +294,11 @@ var App = (function () {
 
     if (next) {
       var togo = next.km - total;
-      $('#aheadLine').textContent = next.name + ', ' + kmText(Math.max(0, togo)) + ' on.';
-      var prevKm = Content.lastWaypoint(total).km;
-      var span = Math.max(1, next.km - prevKm);
-      $('#aheadBar').style.width = Math.max(2, Math.min(100, ((total - prevKm) / span) * 100)) + '%';
-      $('#aheadBox').hidden = false;
+      $('#aheadLine').innerHTML = '<span>Ahead</span> ';
+      $('#aheadLine').appendChild(document.createTextNode(next.name + ', ' + kmText(Math.max(0, togo)) + ' on.'));
     } else {
-      $('#aheadLine').textContent = 'The road is finished. You walked all of it.';
-      $('#aheadBar').style.width = '100%';
+      $('#aheadLine').innerHTML = '<span>The end</span> ';
+      $('#aheadLine').appendChild(document.createTextNode('The road is finished. You walked all of it.'));
     }
 
     var ng = Store.newGround();
@@ -344,6 +370,25 @@ var App = (function () {
     if (was) { buzz(28, 140); renderCamp(); }
   }
 
+  /** A drawn empty state, in the same ink as the map. Never a bare sentence. */
+  function blank(kind, line, inline) {
+    var wrap = document.createElement('div');
+    wrap.className = 'blank';
+    var d = Marks.drawing(kind);
+    if (d) wrap.appendChild(d);
+    var p = document.createElement('p');
+    p.textContent = line;
+    wrap.appendChild(p);
+    return inline ? wrap : wrap;
+  }
+
+  /** The app writes dates one way everywhere: 7 Sep 2026, 08:22. */
+  function readTime(ms) {
+    var dt = new Date(ms);
+    var mm = dt.getMinutes();
+    return Store.shortDate(Store.ymd(dt)) + ', ' + dt.getHours() + ':' + (mm < 10 ? '0' + mm : mm);
+  }
+
   function esc(s) {
     return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
   }
@@ -393,14 +438,17 @@ var App = (function () {
     var db = Store.all();
     var walked = 0, i;
     for (i = 0; i < keys.length; i++) if (Store.walkedOn(keys[i])) walked++;
-    $('#journalLede').textContent = db.start
-      ? 'Kept since ' + Store.shortDate(db.start) + '. ' + walked + (walked === 1 ? ' day walked, ' : ' days walked, ') + Content.fmtKm(Store.totalKm()) + ' km on the road.'
+    var kept = Store.firstDay();
+    $('#journalLede').textContent = kept
+      ? 'Kept since ' + Store.shortDate(kept) + '. ' + walked + (walked === 1 ? ' day walked, ' : ' days walked, ') + Content.fmtKm(Store.totalKm()) + ' km on the road.'
       : 'Nothing written yet.';
 
     if (!keys.length) {
-      list.innerHTML = '<p class="empty">The first page is written the first day you walk. Nothing is asked of you but the walking.</p>';
+      list.className = '';
+      list.appendChild(blank('journal', 'The first page is written the first day you walk. Nothing is asked of you but the walking.'));
       return;
     }
+    list.className = 'stagger';
     var lastRegion = null;
     for (i = 0; i < keys.length; i++) {
       var en = entryFor(keys[i], forged);
@@ -460,6 +508,7 @@ var App = (function () {
 
     var grid = $('#gearGrid');
     grid.innerHTML = '';
+    grid.className = 'grid stagger';
     for (var i = 0; i < Content.GEAR.length; i++) {
       var g = Content.GEAR[i];
       var has = !!forged[g.id];
@@ -485,7 +534,9 @@ var App = (function () {
     var keys = Object.keys(db.keeps);
     $('#keepNote').textContent = keys.length
       ? 'Things people put into your hands on the road. Not one of them is worth money, which is rather the point.'
-      : 'Nothing yet. People give things to walkers who are still walking.';
+      : 'People give things to walkers who are still walking.';
+    kg.className = keys.length ? 'grid stagger' : 'blank';
+    if (!keys.length) kg.appendChild(blank('keeps', 'Nothing in the pack yet. The first thing anyone gives you is a brass button, twenty two kilometres in.', true));
     for (var j = 0; j < keys.length; j++) {
       var k = Encounters.keep(keys[j]);
       if (!k) continue;
@@ -551,7 +602,7 @@ var App = (function () {
     if (db.mode === 'sensor' && allowed) {
       html = '<p class="k">This phone is counting</p>' +
         '<p>Rucksack reads the step counter built into the phone. It keeps counting while the app is closed, and the app banks whatever is new each time you open it.</p>' +
-        '<p class="fine">Last read: ' + (db.sensor.at ? new Date(db.sensor.at).toLocaleString() : 'not yet') +
+        '<p class="fine">Last read: ' + (db.sensor.at ? readTime(db.sensor.at) : 'not yet') +
         '. Counter since the phone last started: ' + (db.sensor.raw >= 0 ? db.sensor.raw.toLocaleString() : 'unavailable') + '.</p>' +
         '<p class="fine">If the phone restarts, the steps taken between the restart and the next time you open Rucksack are lost. That is a limit of the sensor, not a choice.</p>' +
         '<button class="btn ghost small" id="toManual">Write my steps down instead</button>';
@@ -594,7 +645,10 @@ var App = (function () {
     list.innerHTML = '';
     var keys = Store.dayKeys().slice(-30).reverse();
     if (!keys.length) {
-      list.innerHTML = '<p class="empty">Nothing counted yet.</p>';
+      list.className = '';
+      list.appendChild(blank('ledger', 'Nothing counted yet. The first number lands the first time you walk about a kilometre.'));
+    } else {
+      list.className = 'ledger stagger';
     }
     for (var i = 0; i < keys.length; i++) {
       var d = keys[i], row = document.createElement('div');
@@ -605,12 +659,24 @@ var App = (function () {
       row.querySelector('.ls').textContent = e.steps.toLocaleString() + ' steps';
       row.querySelector('.lk').textContent = Content.fmtKm(e.km) + ' km' + (e.capped ? ' (capped)' : '');
       if (e.capped) row.classList.add('capped');
+      if (!Store.walkedOn(d)) row.classList.add('rest');
       list.appendChild(row);
     }
 
     $('#setName').value = db.name || '';
     $('#setHaptics').checked = db.settings.haptics !== false;
     $('#aboutPerms').textContent = 'Permissions declared: physical activity, for the step counter, and vibration. No internet, no location, no account.';
+  }
+
+  /** Inline, next to the field it belongs to. Nothing in this app uses alert(). */
+  function manualError(msg) {
+    var el = $('#manualErr'), input = $('#manualSteps');
+    if (!el) return;
+    el.textContent = msg || '';
+    el.hidden = !msg;
+    input.classList.toggle('bad', !!msg);
+    input.setAttribute('aria-invalid', msg ? 'true' : 'false');
+    if (msg) input.focus();
   }
 
   /* -------------------------------------------------------------- exports */
@@ -648,20 +714,27 @@ var App = (function () {
   }
 
   /* ------------------------------------------------------------ navigation */
-  var ICONS = {
-    camp: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M3 20h18"/><path d="M12 5 5 20"/><path d="m12 5 7 15"/><path d="M12 12l-4 8"/></svg>',
-    map: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="m3 6 6-2 6 2 6-2v14l-6 2-6-2-6 2z"/><path d="M9 4v14"/><path d="M15 6v14"/></svg>',
-    journal: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M5 4h11a2 2 0 0 1 2 2v14H7a2 2 0 0 1-2-2z"/><path d="M9 8h6"/><path d="M9 12h6"/><path d="M9 16h3"/></svg>',
-    pack: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M7 9a5 5 0 0 1 10 0v11H7z"/><path d="M10 9V6a2 2 0 0 1 4 0v3"/><path d="M7 14h10"/></svg>',
-    ledger: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M4 5h16v14H4z"/><path d="M8 9h8"/><path d="M8 13h8"/><path d="M8 17h5"/></svg>'
-  };
-
   function show(v) {
     view = v;
     $$('.view').forEach(function (el) { el.hidden = el.id !== 'v-' + v; });
     $$('.tab').forEach(function (t) { t.classList.toggle('on', t.dataset.view === v); });
     if (v === 'camp') renderCamp();
-    if (v === 'map') { MapView.resize(); renderMapChrome(); MapView.invalidate(); }
+    if (v === 'map') {
+      // the first tile of the continent takes a moment to draw, so say so
+      var wait = $('#mapWait');
+      if (wait && !mapDrawn) wait.hidden = false;
+      MapView.resize();
+      renderMapChrome();
+      // coming back to a map you left somewhere else, go find the wanderer again
+      if (!MapView.seesKm(Store.totalKm())) MapView.focus(Store.totalKm(), Math.max(0.9, MapView.scale()));
+      MapView.invalidate();
+      requestAnimationFrame(function () {
+        requestAnimationFrame(function () {
+          mapDrawn = true;
+          if (wait) wait.hidden = true;
+        });
+      });
+    }
     if (v === 'journal') renderJournal();
     if (v === 'pack') renderPack();
     if (v === 'ledger') renderLedger();
@@ -677,23 +750,38 @@ var App = (function () {
     else if (view === 'ledger') renderLedger();
   }
 
+  /* Starting twice would bind the map gestures twice, so every pan would move
+     the camera two or three times as far. It can only happen from a stray
+     second click on a button that is already gone, but the guard is free. */
+  var started = false;
   function startApp() {
+    if (started) return;
+    started = true;
     $('#tabs').hidden = false;
     $$('.tab').forEach(function (t) {
       var i = t.querySelector('.ti');
-      if (i) i.innerHTML = ICONS[t.dataset.view] || '';
+      var g = Marks.icon(t.dataset.view);
+      if (i && g) { i.innerHTML = ''; i.appendChild(g); }
+    });
+    [['#mapMe', 'you'], ['#mapFit', 'all'], ['#mapIn', 'plus'], ['#mapOut', 'minus']].forEach(function (pair) {
+      var b = $(pair[0]), g = Marks.icon(pair[1]);
+      if (b && g) { b.innerHTML = ''; b.appendChild(g); }
     });
     MapView.init($('#mapCanvas'), pickWaypoint);
     MapView.focus(Store.totalKm(), 0.9);
     Store.pollSensor();
     show('camp');
+    startPolling();
+    if (Store.all().mode === 'sensor' && Store.sensorRaw() < 0) {
+      whenSensorReads(function () { if (Store.pollSensor() > 0) refresh(); });
+    }
+  }
+
+  function startPolling() {
     clearInterval(pollTimer);
     pollTimer = setInterval(function () {
       if (Store.pollSensor() > 0) refresh();
     }, 30000);
-    if (Store.all().mode === 'sensor' && Store.sensorRaw() < 0) {
-      whenSensorReads(function () { if (Store.pollSensor() > 0) refresh(); });
-    }
   }
 
   function bind() {
@@ -709,8 +797,15 @@ var App = (function () {
     $('#expJournal').onclick = function () { saveFile('rucksack-journal.txt', 'text/plain', journalText()); };
     $('#expData').onclick = function () { saveFile('rucksack-data.json', 'application/json', JSON.stringify(Store.exportObject(), null, 2)); };
     $('#manualSave').onclick = function () {
-      var v = parseInt($('#manualSteps').value, 10);
-      if (!(v >= 0)) { toast('Write in a step count first.'); return; }
+      var raw = ($('#manualSteps').value || '').trim();
+      var v = parseInt(raw, 10);
+      if (raw === '' || isNaN(v)) return manualError('Write in a number of steps first.');
+      if (v < 0) return manualError('A day cannot have fewer than no steps.');
+      if (v > Store.MAX_DAY_STEPS) {
+        return manualError('That is more than ' + Store.MAX_DAY_STEPS.toLocaleString() +
+          ' steps, which is further than anyone walks in a day.');
+      }
+      manualError(null);
       var before = Store.totalKm();
       Store.setSteps(Store.today(), v);
       renderLedger();
@@ -718,6 +813,7 @@ var App = (function () {
       var gained = Store.totalKm() - before;
       toast(gained > 0 ? 'Counted. ' + kmText(gained) + ' further on.' : 'Ledger updated.');
     };
+    $('#manualSteps').oninput = function () { manualError(null); };
     $('#setNameSave').onclick = function () {
       Store.all().name = ($('#setName').value || '').trim().slice(0, 20) || 'Wanderer';
       Store.save(); toast('Saved.');
@@ -750,6 +846,8 @@ var App = (function () {
     if (Store.all().onboarded) startApp();
     else {
       $('#onboard').hidden = false;
+      var m = $('#obMark');
+      if (m) m.appendChild(Marks.mark(66));
       obShow();
       obPaint();
       if (!Store.sensorAvailable()) {
@@ -768,12 +866,27 @@ var App = (function () {
   }
   function onResume() {
     if (!Store.all().onboarded) return;
-    if (Store.pollSensor() > 0) refresh();
-    else refresh();
+    Store.pollSensor();
+    refresh();
+    startPolling();
     if (view === 'camp' && !campRaf) { campStart = performance.now(); campLoop(); }
+    // Android re-registers the sensor listener as the app comes back, so the
+    // first read after a resume can still be -1. Wait for a real one rather
+    // than leaving the day's walk uncounted until the next poll.
+    if (Store.all().mode === 'sensor' && Store.sensorRaw() < 0) {
+      whenSensorReads(function () { if (Store.pollSensor() > 0) refresh(); });
+    }
   }
+  /* Nothing may keep running behind a paused app: not the paint loop, not the
+     sensor poll, and not the timer that waits for a permission answer. */
   function onPause() {
     if (campRaf) { cancelAnimationFrame(campRaf); campRaf = 0; }
+    if (obRaf) { cancelAnimationFrame(obRaf); obRaf = 0; }
+    clearInterval(pollTimer); pollTimer = 0;
+    clearInterval(permTimer); permTimer = 0;
+    clearInterval(sensorWait); sensorWait = 0;
+    clearTimeout(toastTimer);
+    var t = $('#toast'); if (t) t.classList.remove('on');
   }
 
   document.addEventListener('DOMContentLoaded', init);

@@ -1,42 +1,42 @@
 {
- "url": "http://127.0.0.1:8412/index.html",
+ "url": "http://127.0.0.1:8824/index.html",
  "out": "/Users/sherry/Documents/DEVPROJECTS/rucksack/store/screenshots",
  "width": 540,
  "height": 960,
  "dpr": 2,
- "wait": 2800,
+ "wait": 3000,
  "colorScheme": "light",
  "seed": "/* A believable eight-month crossing, built deterministically.\n   Used for browser testing and for the store screenshots. Returns the whole\n   localStorage record for rucksack.v1. */\nfunction buildRucksack(todayYmd, opts) {\n  var o = Object.assign({ days: 268, targetKm: 1368, name: 'Hana' }, opts || {});\n  var s = 771453;\n  function rnd() { s ^= s << 13; s >>>= 0; s ^= s >> 17; s ^= s << 5; s >>>= 0; return s / 4294967296; }\n  function pad(n) { return n < 10 ? '0' + n : '' + n; }\n  function ymd(d) { return d.getFullYear() + '-' + pad(d.getMonth() + 1) + '-' + pad(d.getDate()); }\n  var p = todayYmd.split('-').map(Number);\n  var base = new Date(p[0], p[1] - 1, p[2]);\n\n  /* A commuter's year: two rest days most weeks, a long weekend walk, one flu week. */\n  var raw = [], i;\n  for (i = o.days - 1; i >= 0; i--) {\n    var d = new Date(base.getFullYear(), base.getMonth(), base.getDate() - i);\n    var dow = d.getDay();\n    var x = rnd(), steps;\n    if (i > 196 && i < 203) steps = Math.round(300 + rnd() * 500);            // a week off her feet\n    else if (dow === 0 && x < 0.55) steps = Math.round(400 + rnd() * 700);    // hearth day\n    else if (dow === 3 && x < 0.30) steps = Math.round(500 + rnd() * 600);    // hearth day\n    else if (dow === 6) steps = Math.round(11000 + rnd() * 9000);             // the long Saturday\n    else steps = Math.round(6200 + rnd() * 5200);\n    raw.push({ d: ymd(d), steps: steps });\n  }\n  var sum = 0;\n  for (i = 0; i < raw.length; i++) sum += raw[i].steps;\n  var scale = (o.targetKm * 1300) / sum;\n  var days = {}, total = 0, run = [];\n  for (i = 0; i < raw.length; i++) {\n    var st = Math.round(raw[i].steps * scale);\n    var km = Math.round((st / 1300) * 1000) / 1000;\n    if (km > 40) km = 40;\n    days[raw[i].d] = { steps: st, km: km, capped: km >= 40 };\n    total += km;\n    run.push({ d: raw[i].d, at: Math.round(total * 1000) / 1000 });\n  }\n\n  /* Who she has met, dated by the day her distance passed them. */\n  var TRIG = [\n    ['road', 3], ['marn1', 22, 'button'], ['sef1', 34, 'rope'], ['oro1', 61],\n    ['marn2', 118], ['chapel', 140], ['ferry2', 205], ['mill', 308],\n    ['halda1', 356, 'charcoal'], ['dog1', 430], ['dog2', 447], ['chapel2', 488],\n    ['oroA', 556], ['ivo1', 664, 'salt'], ['caravan', 738], ['bone', 776],\n    ['white', 924], ['oro2', 1001], ['ket1', 1042, 'fleece'], ['stones', 1078],\n    ['horse', 1220]\n  ];\n  function dayAt(km) {\n    for (var j = 0; j < run.length; j++) if (run[j].at >= km) return run[j].d;\n    return null;\n  }\n  var met = {}, keeps = {}, flags = {};\n  for (i = 0; i < TRIG.length; i++) {\n    var t = TRIG[i], when = dayAt(t[1]);\n    if (!when) continue;\n    met[t[0]] = { d: when, km: t[1] };\n    if (t[2]) keeps[t[2]] = when;\n    if (t[0] === 'dog2') flags.biscuit = when;\n  }\n\n  var todayKm = days[todayYmd] ? days[todayYmd].km : 0;\n  return {\n    onboarded: true,\n    name: o.name,\n    start: raw[0].d,\n    mode: 'manual',\n    sensor: { raw: -1, at: 0 },\n    days: days,\n    met: met,\n    keeps: keeps,\n    flags: flags,\n    camp: { km: Math.round((total - todayKm) * 1000) / 1000, d: raw[raw.length - 2].d },\n    settings: { haptics: true, sound: false }\n  };\n}\n\n(function(){ try {\n  var K = 'rucksack.v1';\n  if (localStorage.getItem(K)) return;\n  var n = new Date(), p = function(x){ return String(x).padStart(2,'0') };\n  var t = n.getFullYear()+'-'+p(n.getMonth()+1)+'-'+p(n.getDate());\n  localStorage.setItem(K, JSON.stringify(buildRucksack(t)));\n} catch(e){} })();\n",
  "shots": [
   {
    "name": "01-camp",
-   "before": "(function(){ App.closeSheet(); App.go('camp'); document.querySelector('#v-camp .scroller').scrollTop = 0; })()",
+   "before": "(function(){ App.closeSheet(); App.go('camp'); document.querySelector('#v-camp .scroller').scrollTop = 84; })()",
    "waitMs": 1800
   },
   {
    "name": "02-map",
-   "before": "(function(){ App.go('map'); MapView.focus(Store.totalKm() - 120, 0.62); })()",
-   "waitMs": 2200
+   "before": "(function(){ App.closeSheet(); App.go('map'); MapView.focus(Store.totalKm(), 0.78); })()",
+   "waitMs": 2600
   },
   {
    "name": "03-encounter",
    "before": "(function(){ App.go('camp'); var e = Store.pendingEncounters()[0]; if (e) App.openEncounter(e); })()",
-   "waitMs": 1400
+   "waitMs": 1800
   },
   {
    "name": "04-journal",
    "before": "(function(){ App.closeSheet(); App.go('journal'); document.querySelector('#v-journal .scroller').scrollTop = 0; })()",
-   "waitMs": 1400
+   "waitMs": 1800
   },
   {
    "name": "05-pack",
    "before": "(function(){ App.go('pack'); document.querySelector('#v-pack .scroller').scrollTop = 0; })()",
-   "waitMs": 1400
+   "waitMs": 1800
   },
   {
    "name": "06-ledger",
    "before": "(function(){ App.go('ledger'); document.querySelector('#v-ledger .scroller').scrollTop = 0; })()",
-   "waitMs": 1400
+   "waitMs": 1800
   }
  ]
 }

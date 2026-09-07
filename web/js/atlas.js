@@ -377,7 +377,7 @@ var Atlas = (function () {
 
   return {
     SAMPLES: SAMPLES, BOUNDS: BOUNDS, PATH_LEN: PATH_LEN,
-    at: at, landRadius: landRadius, landDrift: landDrift,
+    at: at, landRadius: landRadius, landDrift: landDrift, landPath: landPath,
     drawBase: drawBase, glyph: glyph, mark: mark, pathFor: pathFor, rnd: rnd
   };
 })();

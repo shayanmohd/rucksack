@@ -23,6 +23,19 @@ var MapView = (function () {
     return getComputedStyle(document.documentElement).getPropertyValue(v).trim();
   }
 
+  /* The region plate and the waypoint bar float over the canvas, so the part of
+     the map you can actually see is shorter than the canvas. Fitting and
+     centring both work against this band, otherwise "All" hides the first
+     three hundred kilometres behind the bar at the bottom. */
+  function band() {
+    var top = 96 + safeTop(), bottom = 122 + safeBottom();
+    return { top: top, bottom: bottom, h: Math.max(90, vh - top - bottom) };
+  }
+  function bandOffset() {
+    var b = band();
+    return b.top + b.h / 2 - vh / 2;
+  }
+
   function init(canvas, pick) {
     cvs = canvas; ctx = cvs.getContext('2d'); onPick = pick;
     ink = css('--ink') || ink; paper = css('--paper') || paper;
@@ -37,8 +50,8 @@ var MapView = (function () {
     var r = cvs.getBoundingClientRect();
     vw = Math.max(1, Math.round(r.width)); vh = Math.max(1, Math.round(r.height));
     cvs.width = Math.round(vw * dpr); cvs.height = Math.round(vh * dpr);
-    var b = Atlas.BOUNDS;
-    minS = Math.min(vw / (b.x1 - b.x0), vh / (b.y1 - b.y0)) * 0.88;
+    var b = Atlas.BOUNDS, bd = band();
+    minS = Math.min((vw - 30) / (b.x1 - b.x0), bd.h / (b.y1 - b.y0));
     if (cam.s < minS) cam.s = minS;
     base = null;
     invalidate();
@@ -46,27 +59,35 @@ var MapView = (function () {
 
   function fit() {
     var b = Atlas.BOUNDS;
-    cam.cx = (b.x0 + b.x1) / 2; cam.cy = (b.y0 + b.y1) / 2;
     cam.s = minS;
+    cam.cx = (b.x0 + b.x1) / 2;
+    cam.cy = (b.y0 + b.y1) / 2 - bandOffset() / cam.s;
     clamp(); base = null; invalidate();
   }
 
-  /** Centre on a route kilometre. */
+  /** Centre on a route kilometre, in the part of the map that is not covered. */
   function focus(km, scale) {
     var p = Atlas.at(km);
-    cam.cx = p.x; cam.cy = p.y;
     if (scale) cam.s = Math.max(minS, Math.min(maxS, scale));
+    cam.cx = p.x; cam.cy = p.y - bandOffset() / cam.s;
     clamp(); invalidate();
   }
 
+  /** True when the wanderer is off the visible band and worth going back to. */
+  function seesKm(km) {
+    var p = Atlas.at(km), q = toScreen(p.x, p.y), bd = band();
+    return q.x > 24 && q.x < vw - 24 && q.y > bd.top && q.y < vh - bd.bottom;
+  }
+
   function clamp() {
-    var b = Atlas.BOUNDS;
-    var halfW = vw / (2 * cam.s), halfH = vh / (2 * cam.s);
-    var w = b.x1 - b.x0, h = b.y1 - b.y0;
-    if (w * cam.s <= vw) cam.cx = (b.x0 + b.x1) / 2;
+    var b = Atlas.BOUNDS, bd = band();
+    var halfW = vw / (2 * cam.s);
+    var topW = (bd.top - vh / 2) / cam.s;         // band edges, as offsets from cam.cy
+    var botW = (vh - bd.bottom - vh / 2) / cam.s;
+    if ((b.x1 - b.x0) * cam.s <= vw) cam.cx = (b.x0 + b.x1) / 2;
     else cam.cx = Math.max(b.x0 + halfW, Math.min(b.x1 - halfW, cam.cx));
-    if (h * cam.s <= vh) cam.cy = (b.y0 + b.y1) / 2;
-    else cam.cy = Math.max(b.y0 + halfH, Math.min(b.y1 - halfH, cam.cy));
+    if ((b.y1 - b.y0) <= (botW - topW)) cam.cy = (b.y0 + b.y1) / 2 - (topW + botW) / 2;
+    else cam.cy = Math.max(b.y0 - topW, Math.min(b.y1 - botW, cam.cy));
   }
 
   function viewRect(pad) {
@@ -107,8 +128,8 @@ var MapView = (function () {
     var bucket = Math.round(frontier / 4) * 4;
     if (fog.km === bucket) return;
     fog.km = bucket;
-    fog.near = Atlas.pathFor(bucket + 1, bucket + 230, 20);
-    fog.far = Atlas.pathFor(bucket + 230, 1e9, 20);
+    fog.near = Atlas.pathFor(bucket + 1, bucket + 230, 3);
+    fog.far = Atlas.pathFor(bucket + 230, 1e9, 3);
   }
 
   function world(c) {
@@ -169,7 +190,10 @@ var MapView = (function () {
       ctx.stroke();
     }
 
-    // cartographer's fog over ground you have not reached
+    /* Cartographer's fog over ground you have not reached. Held inside the
+       coastline: unclipped it painted bare discs of hatching out on the sea. */
+    ctx.save();
+    ctx.clip(Atlas.landPath());
     ctx.fillStyle = 'rgba(241,231,210,0.52)';
     if (fog.near) ctx.fill(fog.near);
     ctx.fillStyle = 'rgba(241,231,210,0.80)';
@@ -189,6 +213,7 @@ var MapView = (function () {
       ctx.stroke();
       ctx.restore();
     }
+    ctx.restore();
     ctx.restore();
 
     drawLabels(total);
@@ -378,6 +403,6 @@ var MapView = (function () {
 
   function scale() { return cam.s; }
 
-  return { init: init, resize: resize, fit: fit, focus: focus, draw: draw,
+  return { init: init, resize: resize, fit: fit, focus: focus, draw: draw, seesKm: seesKm,
            invalidate: invalidate, zoomBy: zoomBy, scale: scale, maxScale: function () { return maxS; } };
 })();

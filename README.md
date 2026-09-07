@@ -67,11 +67,15 @@ Release signing reads `android/keystore.properties`, which is not in the reposit
 
 ## Store assets
 
-`store/brand.json` is the icon, drawn from primitives:
+`store/icon.svg` is the icon and `store/feature.html` the feature graphic, both written by hand. One
+command renders the Play assets, the adaptive icon drawables and the contact sheet you check them on:
 
 ```sh
-python _shiptools/brand.py store/brand.json --out store --res android/app/src/main/res
+node _shiptools/render-brand.js rucksack
 ```
+
+The mark is a path winding across contour lines toward a low sun, and `web/js/marks.js` draws the same
+geometry inside the app, so the launcher icon and the first screen are one thing.
 
 `store/shots.json` drives the six 1080x1920 screenshots through `_shiptools/shots.js`, seeded from
 `store/seed.js` with a believable eight month crossing so the pictures show a populated app rather than

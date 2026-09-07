@@ -1,9 +1,6 @@
-First release.
+Every camp picture was drawing its landscape in the wrong colour. Fixed, so all eleven regions look
+like themselves: reed water, salt flats, drowned bell towers, lanterns over the fen.
 
-Your real steps carry a wanderer across Elsewhere, a hand-drawn continent of 3,500 kilometres. Eleven
-regions, 109 named places, forty one encounters with people who remember you, and a road that ends.
-
-1,300 steps make a kilometre, at most 40 kilometres a day. Camp is painted where your feet stopped and
-the journal writes the day down for you.
-
-No account, no ads, no purchases, no location and no internet permission.
+New: the whole road as a contour ribbon on the camp screen, so you can see where you stand on all
+3,500 km at once. A new icon and drawn pictures throughout. The map's fog stays inside the coast,
+and "All" fits the continent. A phone whose clock moves no longer breaks the day count.

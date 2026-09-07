@@ -4,11 +4,22 @@
 var Paint = (function () {
   'use strict';
 
+  /* Reads '#rrggbb', '#rgb' and the 'rgb(r,g,b)' strings this module makes
+     itself. mix() feeds its own output back in constantly, and a parser that
+     only understood hex turned every derived colour into flat blue. */
   function hex(h) {
-    h = h.replace('#', '');
-    return [parseInt(h.slice(0, 2), 16), parseInt(h.slice(2, 4), 16), parseInt(h.slice(4, 6), 16)];
+    h = String(h).trim();
+    if (h.charAt(0) === '#') {
+      h = h.slice(1);
+      if (h.length === 3) h = h.charAt(0) + h.charAt(0) + h.charAt(1) + h.charAt(1) + h.charAt(2) + h.charAt(2);
+      return [parseInt(h.slice(0, 2), 16), parseInt(h.slice(2, 4), 16), parseInt(h.slice(4, 6), 16)];
+    }
+    var m = h.match(/-?\d*\.?\d+/g);
+    if (m && m.length >= 3) return [+m[0], +m[1], +m[2]];
+    return [0, 0, 0];
   }
-  function rgb(a) { return 'rgb(' + (a[0] | 0) + ',' + (a[1] | 0) + ',' + (a[2] | 0) + ')'; }
+  function clamp255(n) { return n < 0 ? 0 : n > 255 ? 255 : Math.round(n); }
+  function rgb(a) { return 'rgb(' + clamp255(a[0]) + ',' + clamp255(a[1]) + ',' + clamp255(a[2]) + ')'; }
   function mix(a, b, t) {
     var x = hex(a), y = hex(b);
     return rgb([x[0] + (y[0] - x[0]) * t, x[1] + (y[1] - x[1]) * t, x[2] + (y[2] - x[2]) * t]);
@@ -115,10 +126,10 @@ var Paint = (function () {
         for (i = 0; i < 3; i++) windmill(c, w * (0.14 + i * 0.32 + R() * 0.06), horizon + 1, h * 0.13, col);
         break;
       case 'wood':
-        for (i = 0; i < 40; i++) {
+        for (i = 0; i < 46; i++) {
           x = R() * w;
-          if (R() < 0.55) conifer(c, x, horizon + 2, h * (0.10 + R() * 0.12), col);
-          else broadleaf(c, x, horizon + 2, h * (0.09 + R() * 0.10), col);
+          if (R() < 0.55) conifer(c, x, horizon + 2, h * (0.08 + R() * 0.10), col);
+          else broadleaf(c, x, horizon + 2, h * (0.07 + R() * 0.08), col);
         }
         break;
       case 'salt':
@@ -178,10 +189,20 @@ var Paint = (function () {
         }
         break;
       case 'wood':
+        // near trunks, rooted on the ground and leaning off into the canopy
         for (i = 0; i < 9; i++) {
           x = R() * w;
+          var th = h * (0.36 + R() * 0.26), tw = h * (0.007 + R() * 0.008), lean = (R() - 0.5) * h * 0.05;
           c.fillStyle = col;
-          c.fillRect(x, ground - h * (0.30 + R() * 0.2), 4 + R() * 5, h * 0.4);
+          c.beginPath();
+          c.moveTo(x - tw, ground + h * 0.01);
+          c.lineTo(x + tw, ground + h * 0.01);
+          c.lineTo(x + tw * 0.55 + lean, ground - th);
+          c.lineTo(x - tw * 0.55 + lean, ground - th);
+          c.closePath(); c.fill();
+          c.beginPath();
+          c.ellipse(x + lean, ground - th, tw * 7.5, th * 0.13, 0, 0, 6.2832);
+          c.fill();
         }
         break;
       case 'salt':
@@ -206,10 +227,18 @@ var Paint = (function () {
       case 'coast':
         break;
       case 'pass':
+        // scree: angular chips resting on the ground, not floating balls
         for (i = 0; i < 22; i++) {
           x = R() * w;
-          c.fillStyle = col;
-          c.beginPath(); c.arc(x, ground - R() * h * 0.05, 2 + R() * 5, 0, 6.2832); c.fill();
+          y = ground - R() * h * 0.035;
+          var sz = h * (0.012 + R() * 0.026);
+          c.fillStyle = mix(col, '#0F0D0A', 0.42);
+          c.beginPath();
+          c.moveTo(x - sz, y);
+          c.lineTo(x - sz * 0.5, y - sz * (0.9 + R() * 0.5));
+          c.lineTo(x + sz * 0.7, y - sz * 0.7);
+          c.lineTo(x + sz, y);
+          c.closePath(); c.fill();
         }
         break;
       case 'orchard':
@@ -517,15 +546,18 @@ var Paint = (function () {
     var horizon = h * (0.50 + (reg.terrain === 'steppe' || reg.terrain === 'salt' ? 0.08 : 0));
     var ground = h * 0.86;
 
-    // sky
-    var g = c.createLinearGradient(0, 0, 0, horizon + h * 0.06);
+    /* Sky, carried as one gradient all the way down to the ground. Two stacked
+       fills left a hard horizontal seam under every open horizon. */
+    var gEnd = ground + h * 0.03, hz = (horizon + h * 0.05) / gEnd;
+    var g = c.createLinearGradient(0, 0, 0, gEnd);
     g.addColorStop(0, sky[0]);
-    g.addColorStop(0.62, sky[1]);
-    g.addColorStop(1, sky[2]);
+    g.addColorStop(hz * 0.62, sky[1]);
+    g.addColorStop(hz, sky[2]);
+    g.addColorStop(1, mix(sky[2], '#3B3527', 0.38));
     c.fillStyle = g;
-    c.fillRect(0, 0, w, horizon + h * 0.08);
+    c.fillRect(0, 0, w, gEnd);
 
-    // low sun
+    // low sun, the same low sun that is in the launcher icon
     var sunAt = null;
     if (wx.dark < 0.25) {
       var sx = w * (0.18 + R() * 0.6), sy = horizon - h * 0.02;
@@ -534,8 +566,31 @@ var Paint = (function () {
       sg.addColorStop(0, 'rgba(255,220,160,' + (0.5 - wx.dark) + ')');
       sg.addColorStop(1, 'rgba(255,220,160,0)');
       c.fillStyle = sg; c.fillRect(0, 0, w, horizon + h * 0.1);
+      // the disc itself, half swallowed by the horizon
+      if (wx.dark < 0.12) {
+        c.fillStyle = 'rgba(255,232,182,' + (0.72 - wx.dark * 2) + ')';
+        c.beginPath(); c.arc(sx, sy + h * 0.012, h * 0.052, 0, 6.2832); c.fill();
+      }
     }
-    // stars for clear cold skies
+    // three soft banks of cloud, so a flat sky has some weather in it
+    if (wx.id === 'highcloud' || wx.id === 'haze' || wx.id === 'thunder' || wx.id === 'wind') {
+      for (var cb = 0; cb < 3; cb++) {
+        var cy = horizon * (0.22 + cb * 0.21) - R() * h * 0.02;
+        var cw = w * (0.36 + R() * 0.34), cx = R() * (w - cw * 0.4) - cw * 0.2;
+        var ch = h * (0.035 + R() * 0.03);
+        c.save();
+        c.translate(cx + cw / 2, cy);
+        c.scale(1, ch / (cw / 2));
+        var cg = c.createRadialGradient(0, 0, 0, 0, 0, cw / 2);
+        cg.addColorStop(0, 'rgba(255,244,224,' + (0.13 + R() * 0.08).toFixed(3) + ')');
+        cg.addColorStop(0.55, 'rgba(255,244,224,' + (0.06 + R() * 0.04).toFixed(3) + ')');
+        cg.addColorStop(1, 'rgba(255,244,224,0)');
+        c.fillStyle = cg;
+        c.beginPath(); c.arc(0, 0, cw / 2, 0, 6.2832); c.fill();
+        c.restore();
+      }
+    }
+    // stars, and a moon, for clear cold skies
     if (wx.id === 'clear' || wx.id === 'frost') {
       c.fillStyle = 'rgba(255,250,235,0.75)';
       for (var i = 0; i < 34; i++) {
@@ -544,6 +599,21 @@ var Paint = (function () {
         c.beginPath(); c.arc(stx, sty, R() < 0.15 ? 1.3 : 0.8, 0, 6.2832); c.fill();
       }
       c.globalAlpha = 1;
+      // a moon only on the nights the sun has already gone, never two lights at once
+      if (sunAt === null || wx.dark >= 0.12) {
+        var mx = w * (0.14 + R() * 0.72), my = horizon * (0.14 + R() * 0.28), mr = h * 0.032;
+        var mg = c.createRadialGradient(mx, my, mr * 0.6, mx, my, mr * 4.4);
+        mg.addColorStop(0, 'rgba(240,238,226,0.20)');
+        mg.addColorStop(1, 'rgba(240,238,226,0)');
+        c.fillStyle = mg;
+        c.beginPath(); c.arc(mx, my, mr * 4.4, 0, 6.2832); c.fill();
+        // the crescent as one even-odd path: punching it out erased the glow with it
+        c.fillStyle = 'rgba(246,242,228,0.92)';
+        c.beginPath();
+        c.arc(mx, my, mr, 0, 6.2832);
+        c.arc(mx + mr * 0.66, my - mr * 0.3, mr * 0.95, 0, 6.2832);
+        c.fill('evenodd');
+      }
     }
 
     var haze = Math.min(0.7, 0.2 + wx.dark);
@@ -570,19 +640,26 @@ var Paint = (function () {
 
     mid(c, w, h, reg.terrain, R, mix(farCol, '#141310', 0.55), ground, FIRELIGHT);
 
-    // firelight pooling on the ground
+    /* The camp itself. The whole group is nudged along the ground and sometimes
+       mirrored, so two hundred nights are not two hundred identical stagings. */
+    var flip = R() < 0.42, shift = (R() - 0.5) * w * 0.14;
     var fx = w * 0.615, fy = ground + h * 0.035, fs = h * 0.125;
+    c.save();
+    if (flip) { c.translate(w, 0); c.scale(-1, 1); }
+    c.translate(shift, 0);
+
     var fg = c.createRadialGradient(fx, fy, 0, fx, fy, h * 0.42);
     fg.addColorStop(0, 'rgba(255,166,84,0.42)');
     fg.addColorStop(0.5, 'rgba(255,140,60,0.14)');
     fg.addColorStop(1, 'rgba(255,140,60,0)');
     c.fillStyle = fg;
-    c.fillRect(0, ground - h * 0.3, w, h - ground + h * 0.3);
+    c.fillRect(-w, ground - h * 0.3, w * 3, h - ground + h * 0.3);
 
     tent(c, w * 0.19, fy + h * 0.012, h * 0.175, '#241D16');
     seated(c, w * 0.43, fy + h * 0.014, h * 0.19, o.gear || {}, '#1B1610');
     if (o.biscuit) dog(c, w * 0.83, fy + h * 0.012, h * 0.075, '#211A13');
     fire(c, fx, fy, fs, t, R);
+    c.restore();
 
     // a little foreground, so the fire has something to be in front of
     c.fillStyle = 'rgba(10,8,6,0.9)';
@@ -750,10 +827,19 @@ var Paint = (function () {
         }
         break;
       case 'lantern':
-        c.beginPath(); c.moveTo(x - s * 0.26, y - s * 0.16); c.lineTo(x - s * 0.3, y + s * 0.4);
-        c.lineTo(x + s * 0.3, y + s * 0.4); c.lineTo(x + s * 0.26, y - s * 0.16); c.closePath(); c.stroke();
-        c.beginPath(); c.arc(x, y - s * 0.3, s * 0.2, 3.34, 6.08); c.stroke();
-        c.beginPath(); c.arc(x, y + s * 0.14, s * 0.1, 0, 6.2832); c.fill();
+        // a bail, a cap, a glass with a flame in it, a foot
+        c.beginPath(); c.arc(x, y - s * 0.34, s * 0.19, 3.5, 5.92); c.stroke();
+        c.beginPath(); c.moveTo(x - s * 0.28, y - s * 0.24); c.lineTo(x + s * 0.28, y - s * 0.24); c.stroke();
+        c.beginPath();
+        c.moveTo(x - s * 0.22, y - s * 0.24); c.lineTo(x - s * 0.26, y + s * 0.3);
+        c.lineTo(x + s * 0.26, y + s * 0.3); c.lineTo(x + s * 0.22, y - s * 0.24);
+        c.stroke();
+        c.beginPath(); c.moveTo(x - s * 0.34, y + s * 0.4); c.lineTo(x + s * 0.34, y + s * 0.4); c.stroke();
+        c.beginPath();
+        c.moveTo(x - s * 0.08, y + s * 0.16);
+        c.quadraticCurveTo(x - s * 0.1, y - s * 0.06, x + s * 0.02, y - s * 0.14);
+        c.quadraticCurveTo(x + s * 0.1, y - s * 0.02, x + s * 0.08, y + s * 0.16);
+        c.closePath(); c.fill();
         break;
       case 'bell':
         c.beginPath(); c.moveTo(x - s * 0.34, y + s * 0.3);
@@ -772,8 +858,17 @@ var Paint = (function () {
         c.lineTo(x - s * 0.14, y); c.closePath(); c.stroke();
         break;
       case 'amber':
-        c.beginPath(); c.ellipse(x, y, s * 0.3, s * 0.36, 0.3, 0, 6.2832); c.stroke();
-        c.beginPath(); c.arc(x, y, s * 0.09, 0, 6.2832); c.fill();
+        // a drilled bead with something small and very old asleep inside it
+        c.beginPath(); c.ellipse(x, y + s * 0.04, s * 0.32, s * 0.38, 0.24, 0, 6.2832); c.stroke();
+        c.beginPath(); c.arc(x - s * 0.02, y - s * 0.34, s * 0.08, 0.5, 3.9); c.stroke();
+        c.beginPath();
+        c.ellipse(x + s * 0.02, y + s * 0.06, s * 0.09, s * 0.14, 0.5, 0, 6.2832);
+        c.fill();
+        c.lineWidth = Math.max(0.8, s * 0.045);
+        c.beginPath();
+        c.moveTo(x - s * 0.14, y - s * 0.04); c.lineTo(x - s * 0.02, y + s * 0.02);
+        c.moveTo(x + s * 0.16, y + s * 0.14); c.lineTo(x + s * 0.06, y + s * 0.1);
+        c.stroke();
         break;
       case 'lens':
         c.beginPath(); c.arc(x, y, s * 0.38, 0, 6.2832); c.stroke();
