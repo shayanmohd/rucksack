@@ -9,7 +9,7 @@
   --paper-lit:  #F8F0DE;
   --ink:        #2A2721;
   --ink-soft:   #4F4A3C;
-  --ink-quiet:  #6A6252;
+  --ink-quiet:  #645D4D;
   --hair:       rgba(120, 98, 56, 0.24);
   --hair-soft:  rgba(120, 98, 56, 0.13);
   --accent:     #2F5D50;
@@ -17,8 +17,8 @@
   --accent-lit: #3C7264;
   --accent-wash: rgba(47, 93, 80, 0.09);
   --ochre:      #B4762A;          /* drawn things: the sun, contour lines, ink marks */
-  --ochre-ink:  #8A5718;          /* the same hue as type, dark enough to read on paper */
-  --ember:      #A3491A;
+  --ochre-ink:  #845314;          /* the same hue as type, dark enough to read on paper */
+  --ember:      #9A4417;
 
   /* one light source, warm, from above: every shadow is brown, never black */
   --lift-1: 0 1px 1px rgba(84, 62, 24, 0.07), 0 2px 6px -3px rgba(84, 62, 24, 0.16);

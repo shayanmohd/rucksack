@@ -443,6 +443,9 @@ var App = (function () {
       ? 'Kept since ' + Store.shortDate(kept) + '. ' + walked + (walked === 1 ? ' day walked, ' : ' days walked, ') + Content.fmtKm(Store.totalKm()) + ' km on the road.'
       : 'Nothing written yet.';
 
+    // there is nothing to export until the first day is on the page
+    $('#journalExport').hidden = !keys.length;
+
     if (!keys.length) {
       list.className = '';
       list.appendChild(blank('journal', 'The first page is written the first day you walk. Nothing is asked of you but the walking.'));
@@ -798,8 +801,11 @@ var App = (function () {
     $('#expData').onclick = function () { saveFile('rucksack-data.json', 'application/json', JSON.stringify(Store.exportObject(), null, 2)); };
     $('#manualSave').onclick = function () {
       var raw = ($('#manualSteps').value || '').trim();
-      var v = parseInt(raw, 10);
-      if (raw === '' || isNaN(v)) return manualError('Write in a number of steps first.');
+      // a number field accepts exponents, and parseInt('5e3') is 5, so read the
+      // whole number and round it rather than reading the first digits of it
+      var v = Number(raw);
+      if (raw === '' || !isFinite(v)) return manualError('Write in a number of steps first.');
+      v = Math.trunc(v);          // a part of a step is not a step you took
       if (v < 0) return manualError('A day cannot have fewer than no steps.');
       if (v > Store.MAX_DAY_STEPS) {
         return manualError('That is more than ' + Store.MAX_DAY_STEPS.toLocaleString() +
@@ -860,12 +866,22 @@ var App = (function () {
   /* Called by the Android shell. */
   function back() {
     if (!$('#sheet').hidden) { closeSheet(); return true; }
-    if (!$('#onboard').hidden) return false;
+    // an onboarding card past the first is a screen you can leave: Back steps
+    // back through the cards and only gives up the gesture at the first one.
+    if (!$('#onboard').hidden) {
+      if (obStep > 0) { obStep--; obShow(); return true; }
+      return false;
+    }
     if (view !== 'camp') { show('camp'); return true; }
     return false;
   }
   function onResume() {
-    if (!Store.all().onboarded) return;
+    if (!Store.all().onboarded) {
+      // onPause stops the onboarding plate as well; without this it stays a
+      // frozen frame for the rest of the run
+      if (!$('#onboard').hidden && !obRaf) obPaint();
+      return;
+    }
     Store.pollSensor();
     refresh();
     startPolling();

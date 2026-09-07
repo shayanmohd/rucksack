@@ -12,3 +12,4 @@ store/preview/
 node_modules/
 test/shots/
 test/shots-dark/
+test/shots-review/
